@@ -63,6 +63,8 @@ export default function Home() {
         Start Practice
       </Link>
 
+      
+
       <div className="mt-10">
         <h2 className="text-2xl font-bold mb-4">Past Attempts</h2>
         {attempts.length === 0 ? (

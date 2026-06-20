@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { questions } from "@/app/questions";
 import Link from "next/link";
-
+import WeakAreas from "@/app/components/weakareas";
 export default function PracticePage() {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [question, setQuestion] = useState<typeof questions[0] | null>(null);
@@ -108,6 +108,8 @@ export default function PracticePage() {
       </Link>
 
       <h1 className="text-3xl font-bold mb-6">Practice</h1>
+
+      <WeakAreas />
 
       <div className="border p-6 rounded-lg mb-6">
         <h2 className="font-bold mb-4">Question</h2>
