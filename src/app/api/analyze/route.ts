@@ -5,6 +5,8 @@ export async function POST(req: Request) {
   const body = await req.json();
 
   const prompt = `
+You are a JEE Physics tutor. Analyze the student's answer.
+
 Question:
 ${body.question}
 
@@ -17,52 +19,81 @@ ${body.answer}
 Reasoning:
 ${body.reasoning}
 
-Act as a JEE Physics tutor.
-Give concise feedback.
+Return ONLY valid JSON (no markdown, no backticks, no extra text) in this exact format:
+{
+  "mistake_type": "",
+  "concept": "",
+  "difficulty": "",
+  "feedback": ""
+}
+
+Examples of mistake_type: "Formula Error", "Conceptual Mistake", "Calculation Error", "Unit Error", "No Mistake"
+Examples of concept: "Ohms Law", "Kirchhoff's Law", "Series Circuits", "Parallel Circuits", "Power"
+Examples of difficulty: "Easy", "Medium", "Hard"
+
+Keep feedback concise (1-2 sentences).
 `;
 
   try {
     const result = await model.generateContent(prompt);
 
-    // Normalize different possible response shapes into a string
-    let feedback = "";
+    // Extract text from response
+    let rawText = "";
     const r: any = result;
 
     if (!r) {
-      feedback = "No response from model.";
+      rawText = "No response from model.";
     } else if (typeof r === "string") {
-      feedback = r;
+      rawText = r;
     } else if (r.response && typeof r.response.text === "function") {
       try {
-        feedback = r.response.text();
+        rawText = r.response.text();
       } catch (e) {
-        feedback = String(r.response);
+        rawText = String(r.response);
       }
     } else if (r.output && Array.isArray(r.output) && r.output.length) {
-      // Newer clients may place text inside output -> content
       const out = r.output[0];
       if (out.content && Array.isArray(out.content)) {
         const txtParts = out.content
           .map((c: any) => c.text || c["text"])
           .filter(Boolean);
-        feedback = txtParts.join("\n") || JSON.stringify(out);
+        rawText = txtParts.join("\n") || JSON.stringify(out);
       } else if (out.text) {
-        feedback = out.text;
+        rawText = out.text;
       } else {
-        feedback = JSON.stringify(out);
+        rawText = JSON.stringify(out);
       }
     } else if (r.output_text) {
-      feedback = r.output_text;
+      rawText = r.output_text;
     } else {
-      // Fallback to stringifying the result
-      feedback = JSON.stringify(r);
+      rawText = JSON.stringify(r);
     }
 
-    return NextResponse.json({ feedback });
+    // Clean markdown code blocks if any
+    rawText = rawText.trim();
+    if (rawText.startsWith("```")) {
+      rawText = rawText.replace(/```json?/g, "").replace(/```/g, "").trim();
+    }
+
+    // Parse the JSON
+    const analysis = JSON.parse(rawText);
+
+    // Return structured fields
+    return NextResponse.json({
+      mistake_type: analysis.mistake_type || "",
+      concept: analysis.concept || "",
+      difficulty: analysis.difficulty || "",
+      feedback: analysis.feedback || "",
+    });
   } catch (err) {
     console.error("Error generating feedback:", err);
     return NextResponse.json(
-      { feedback: "Error generating feedback from AI." },
+      {
+        mistake_type: "Error",
+        concept: "Error",
+        difficulty: "Error",
+        feedback: "Error generating feedback from AI.",
+      },
       { status: 500 }
     );
   }
