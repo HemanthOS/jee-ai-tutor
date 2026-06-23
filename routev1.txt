@@ -4,14 +4,22 @@ import { model } from "@/lib/gemini";
 export async function POST(req: Request) {
   const body = await req.json();
 
-  const prompt = `Analyze this JEE Physics answer.
+  const prompt = `
+You are a JEE Physics tutor. Analyze the student's answer.
 
-Question: ${body.question}
-Correct: 2A
-Student: ${body.answer}
-Reasoning: ${body.reasoning || "None"}
+Question:
+${body.question}
 
-Return ONLY valid JSON (no markdown):
+Correct Answer:
+2A
+
+Student Answer:
+${body.answer}
+
+Reasoning:
+${body.reasoning}
+
+Return ONLY valid JSON (no markdown, no backticks, no extra text) in this exact format:
 {
   "mistake_type": "",
   "concept": "",
@@ -20,15 +28,19 @@ Return ONLY valid JSON (no markdown):
   "feedback": ""
 }
 
-mistake_type options: "Formula Error", "Conceptual Mistake", "Calculation Error", "Unit Error", "No Mistake"
-concept options: "Ohms Law", "Series Circuits", "Parallel Circuits", "Power", "Current"
-difficulty options: "Easy", "Medium", "Hard"
-coach_note: 1 sentence actionable tip (empty if no mistake)
-feedback: 1-2 sentences max`;
+Examples of mistake_type: "Formula Error", "Conceptual Mistake", "Calculation Error", "Unit Error", "No Mistake"
+Examples of concept: "Ohms Law", "Kirchhoff's Law", "Series Circuits", "Parallel Circuits", "Power"
+Examples of difficulty: "Easy", "Medium", "Hard"
+Examples of coach_note: "Slow down and write every unit before calculating.", "Write reciprocal values separately before adding.", "Double-check your division. Verify units in the final answer.", "Remember V=IR, rearrange carefully before substituting values.", "" (empty string if no mistake)
+
+Keep feedback concise (1-2 sentences).
+Keep coach_note concise (1 sentence, actionable advice).
+`;
 
   try {
     const result = await model.generateContent(prompt);
 
+    // Extract text from response
     let rawText = "";
     const r: any = result;
 
@@ -60,13 +72,16 @@ feedback: 1-2 sentences max`;
       rawText = JSON.stringify(r);
     }
 
+    // Clean markdown code blocks if any
     rawText = rawText.trim();
     if (rawText.startsWith("```")) {
       rawText = rawText.replace(/```json?/g, "").replace(/```/g, "").trim();
     }
 
+    // Parse the JSON
     const analysis = JSON.parse(rawText);
 
+    // Return structured fields
     return NextResponse.json({
       mistake_type: analysis.mistake_type || "",
       concept: analysis.concept || "",
@@ -81,8 +96,8 @@ feedback: 1-2 sentences max`;
         mistake_type: "Error",
         concept: "Error",
         difficulty: "Error",
-        coach_note: "",
-        feedback: "Error generating feedback.",
+        coach_note: "Take your time and review each step carefully.",
+        feedback: "Error generating feedback from AI.",
       },
       { status: 500 }
     );
